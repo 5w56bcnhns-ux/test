@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>貪食蛇遊戲 v2.0</title>
+    <style>
+        /* 樣式保持原樣，符合"不要改原本的操作方式"與視覺風格 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        .game-container { position: relative; width: 500px; text-align: center; }
+        .header { margin-bottom: 20px; color: white; }
+        .title {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #ff4d4d;
+            text-shadow: 0 0 10px rgba(255, 77, 77, 0.7);
+            letter-spacing: 2px;
+        }
+        /* v2.0 功能樣式：計分板 */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto 20px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            color: white;
+        }
+        .score, .high-score { font-size: 1.2rem; font-weight: bold; }
+        
+        canvas {
+            background-color: #000;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+            display: block;
+            margin: 0 auto;
+        }
+        .controls { margin-top: 20px; color: white; display: flex; justify-content: center; gap: 20px; }
+        .instructions { margin-top: 20px; color: #aaa; font-size: 0.9rem; line-height: 1.5; }
+        
+        /* v2.0 功能樣式：遊戲結束回饋 */
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 10;
+            border: 2px solid #ff4d4d;
+            box-shadow: 0 0 30px rgba(255, 77, 77, 0.6);
+        }
+        .game-over h2 { color: #ff4d4d; margin-bottom: 15px; font-size: 2rem; }
+        .final-score { font-size: 1.5rem; margin: 15px 0; }
+        .btn {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .btn:hover {
+            background: #ff1a1a;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 77, 77, 0.7);
+        }
+        @media (max-width: 550px) {
+            .game-container { width: 95%; }
+            .title { font-size: 2rem; }
+            canvas { width: 100%; height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1 class="title">貪食蛇遊戲 v2.0</h1>
+        </div>
+        
+        <div class="stats">
+            <div class="score">分數: <span id="score">0</span></div>
+            <div class="high-score">最高分: <span id="high-score">0</span></div>
+        </div>
+        
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        
+        <div class="controls">
+            <div>方向鍵控制</div>
+        </div>
+        
+        <div class="instructions">
+            <p>使用方向鍵控制蛇的移動方向</p>
+            <p>吃到紅色蘋果會讓蛇變長並增加分數</p>
+            <p>碰到牆壁或自己的身體會結束遊戲</p>
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <h2>遊戲結束!</h2>
+            <div class="final-score">你的分數: <span id="finalScore">0</span></div>
+            <button class="btn" id="restartBtn">重新開始</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const gridSize = 20;
+        const gridWidth = canvas.width / gridSize;
+        const gridHeight = canvas.height / gridSize;
+        
+        let snake = [];
+        let food = {};
+        let direction = 'right';
+        let nextDirection = 'right';
+        let score = 0;
+        
+        // [v2.0 功能實作] 讀取最高分
+        // 優化：使用 parseInt 確保讀取出來是數字，避免字串比對錯誤
+        let highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
+        
+        let gameSpeed = 120;
+        let gameRunning = false;
+        let gameLoop;
+        
+        function initGame() {
+            snake = [{x: 10, y: 10}, {x: 9, y: 10}, {y: 10, x: 8}];
+            generateFood();
+            direction = 'right';
+            nextDirection = 'right';
+            
+            // [v2.0 功能實作] 重置分數顯示
+            score = 0;
+            document.getElementById('score').textContent = score;
+            document.getElementById('high-score').textContent = highScore;
+            
+            gameRunning = true;
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, gameSpeed);
+        }
+        
+        function generateFood() {
+            let newFood;
+            let foodOnSnake;
+            do {
+                foodOnSnake = false;
+                newFood = {
+                    x: Math.floor(Math.random() * gridWidth),
+                    y: Math.floor(Math.random() * gridHeight)
+                };
+                for (let segment of snake) {
+                    if (segment.x === newFood.x && segment.y === newFood.y) {
+                        foodOnSnake = true;
+                        break;
+                    }
+                }
+            } while (foodOnSnake);
+            food = newFood;
+        }
+        
+        function update() {
+            if (!gameRunning) return;
+            direction = nextDirection;
+            const head = {...snake[0]};
+            
+            switch (direction) {
+                case 'up': head.y -= 1; break;
+                case 'down': head.y += 1; break;
+                case 'left': head.x -= 1; break;
+                case 'right': head.x += 1; break;
+            }
+            
+            if (head.x < 0 || head.x >= gridWidth || head.y < 0 || head.y >= gridHeight) {
+                gameOver();
+                return;
+            }
+            
+            for (let i = 0; i < snake.length; i++) {
+                if (snake[i].x === head.x && snake[i].y === head.y) {
+                    gameOver();
+                    return;
+                }
+            }
+            
+            snake.unshift(head);
+            
+            if (head.x === food.x && head.y === food.y) {
+                // [v2.0 功能實作] 即時分數增加
+                // 驗收標準：食物消失，分數增加10分
+                score += 10;
+                document.getElementById('score').textContent = score;
+                
+                // [v2.0 功能實作] 記錄最高分
+                // 驗收標準：當局分數高於歷史記錄才記錄
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snakeHighScore', highScore);
+                    document.getElementById('high-score').textContent = highScore;
+                }
+                
+                generateFood();
+                
+                // 額外優化：難度遞增（符合"玩幾次就膩了"的痛點解決）
+                if (score % 50 === 0 && gameSpeed > 60) {
+                    gameSpeed -= 5;
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(update, gameSpeed);
+                }
+            } else {
+                snake.pop();
+            }
+            draw();
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = index === 0 ? '#4CAF50' : '#388E3C';
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+            });
+            
+            ctx.fillStyle = '#ff4d4d';
+            ctx.beginPath();
+            ctx.arc(food.x * gridSize + gridSize/2, food.y * gridSize + gridSize/2, gridSize/2 - 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ff9999';
+            ctx.beginPath();
+            ctx.arc(food.x * gridSize + gridSize/3, food.y * gridSize + gridSize/3, gridSize/6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(gameLoop);
+            // [v2.0 功能實作] 遊戲結束回饋
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        
+        function restartGame() {
+            document.getElementById('gameOver').style.display = 'none';
+            initGame();
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            switch (e.key) {
+                case 'ArrowUp': if (direction !== 'down') nextDirection = 'up'; break;
+                case 'ArrowDown': if (direction !== 'up') nextDirection = 'down'; break;
+                case 'ArrowLeft': if (direction !== 'right') nextDirection = 'left'; break;
+                case 'ArrowRight': if (direction !== 'left') nextDirection = 'right'; break;
+            }
+        });
+        
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+        
+        // 初始載入顯示最高分
+        document.getElementById('high-score').textContent = highScore;
+        initGame();
+    </script>
+</body>
+</html>
