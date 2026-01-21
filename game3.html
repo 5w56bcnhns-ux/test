@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HTML5 2048 遊戲</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 進階版 - 觸控與紀錄</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -14,21 +14,51 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
+            /* 禁止手機上的雙擊縮放與選取 */
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden; /* 防止整體頁面滾動 */
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
+            padding: 0 10px;
+            box-sizing: border-box;
         }
 
         h1 {
-            font-size: 60px;
+            font-size: 50px;
             color: #776e65;
             margin: 0;
         }
 
-        .score-container {
+        .scores-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        .score-box {
             background-color: #bbada0;
             color: white;
-            padding: 5px 20px;
+            padding: 5px 15px;
             border-radius: 5px;
+            text-align: center;
+            min-width: 60px;
+        }
+
+        .score-label {
+            font-size: 12px;
+            color: #eee4da;
+            display: block;
+        }
+
+        .score-val {
             font-size: 20px;
-            margin-bottom: 20px;
             font-weight: bold;
         }
 
@@ -44,6 +74,7 @@
             padding: 10px;
             box-sizing: border-box;
             position: relative;
+            touch-action: none; /* 關鍵：告訴瀏覽器這裡的觸控由 JS 處理 */
         }
 
         .tile {
@@ -55,10 +86,10 @@
             font-size: 40px;
             font-weight: bold;
             color: #776e65;
-            transition: all 0.1s ease-in-out;
+            transition: transform 0.1s ease-in-out, background-color 0.15s;
         }
 
-        /* 數字對應的顏色樣式 */
+        /* 數字顏色樣式 */
         .x2 { background-color: #eee4da; }
         .x4 { background-color: #ede0c8; }
         .x8 { background-color: #f2b179; color: #f9f6f2; }
@@ -70,6 +101,7 @@
         .x512 { background-color: #edc850; color: #f9f6f2; font-size: 35px; }
         .x1024 { background-color: #edc53f; color: #f9f6f2; font-size: 30px; }
         .x2048 { background-color: #edc22e; color: #f9f6f2; font-size: 30px; }
+        .x4096 { background-color: #3c3a32; color: #f9f6f2; font-size: 30px; }
 
         .game-over {
             position: absolute;
@@ -85,7 +117,8 @@
             font-size: 40px;
             color: #776e65;
             font-weight: bold;
-            display: none; /* 預設隱藏 */
+            display: none;
+            z-index: 10;
         }
 
         button {
@@ -99,15 +132,41 @@
             margin-top: 10px;
         }
 
-        button:hover {
-            background-color: #7f6a56;
+        button:hover { background-color: #7f6a56; }
+
+        .instructions {
+            margin-top: 20px;
+            color: #776e65;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* 手機適配 */
+        @media (max-width: 450px) {
+            #game-board {
+                width: 320px;
+                height: 320px;
+            }
+            .tile { font-size: 30px; }
+            h1 { font-size: 40px; }
         }
     </style>
 </head>
 <body>
 
-    <h1>2048</h1>
-    <div class="score-container">分數: <span id="score">0</span></div>
+    <div class="header">
+        <h1>2048</h1>
+        <div class="scores-wrapper">
+            <div class="score-box">
+                <span class="score-label">分數</span>
+                <span class="score-val" id="score">0</span>
+            </div>
+            <div class="score-box">
+                <span class="score-label">最高分</span>
+                <span class="score-val" id="best-score">0</span>
+            </div>
+        </div>
+    </div>
 
     <div id="game-board">
         <div id="game-message" class="game-over">
@@ -116,16 +175,33 @@
         </div>
     </div>
 
-    <p style="color: #776e65;">使用 <strong>方向鍵</strong> 移動方塊</p>
+    <div class="instructions">
+        電腦：使用 <strong>方向鍵</strong> 移動<br>
+        手機：使用 <strong>手指滑動</strong> 移動
+    </div>
 
     <script>
         const boardSize = 4;
         let board = [];
         let score = 0;
+        let bestScore = 0;
         
-        // 初始化遊戲
+        // 觸控變數
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        // 初始化
         window.onload = function() {
+            // 讀取 LocalStorage
+            let savedBest = localStorage.getItem('2048-bestScore');
+            if (savedBest) {
+                bestScore = parseInt(savedBest);
+                document.getElementById("best-score").innerText = bestScore;
+            }
             resetGame();
+            addTouchListeners();
         };
 
         function resetGame() {
@@ -137,37 +213,167 @@
             ];
             score = 0;
             document.getElementById("game-message").style.display = "none";
-            updateScore();
+            updateScoreDisplay();
             setTwo();
             setTwo();
             updateBoard();
         }
 
-        // 鍵盤監聽
+        // ==========================
+        //       核心邏輯與移動
+        // ==========================
+
         document.addEventListener('keyup', (e) => {
-            if (e.code == "ArrowLeft") {
-                slideLeft();
-                setTwo();
-            }
-            else if (e.code == "ArrowRight") {
-                slideRight();
-                setTwo();
-            }
-            else if (e.code == "ArrowUp") {
-                slideUp();
-                setTwo();
-            }
-            else if (e.code == "ArrowDown") {
-                slideDown();
-                setTwo();
-            }
-            updateBoard();
-            checkGameOver();
+            if (document.getElementById("game-message").style.display === "flex") return;
+            
+            let moved = false;
+            if (e.code == "ArrowLeft") moved = slideLeft();
+            else if (e.code == "ArrowRight") moved = slideRight();
+            else if (e.code == "ArrowUp") moved = slideUp();
+            else if (e.code == "ArrowDown") moved = slideDown();
+
+            if (moved) afterMove();
         });
+
+        function afterMove() {
+            setTwo();
+            updateBoard();
+            updateScoreDisplay();
+            checkGameOver();
+        }
+
+        function filterZero(row) {
+            return row.filter(num => num != 0);
+        }
+
+        function slide(row) {
+            let original = [...row]; // 備份原始行用於比較是否有變動
+            row = filterZero(row); 
+
+            // 合併
+            for (let i = 0; i < row.length - 1; i++) {
+                if (row[i] == row[i+1]) {
+                    row[i] *= 2;
+                    row[i+1] = 0;
+                    score += row[i];
+                }
+            }
+
+            row = filterZero(row);
+            while (row.length < boardSize) {
+                row.push(0);
+            }
+
+            // 檢查該行是否有變化
+            let changed = false;
+            for(let i=0; i<boardSize; i++){
+                if(original[i] !== row[i]) changed = true;
+            }
+            return { newRow: row, changed: changed };
+        }
+
+        function slideLeft() {
+            let boardChanged = false;
+            for (let r = 0; r < boardSize; r++) {
+                let result = slide(board[r]);
+                board[r] = result.newRow;
+                if(result.changed) boardChanged = true;
+            }
+            return boardChanged;
+        }
+
+        function slideRight() {
+            let boardChanged = false;
+            for (let r = 0; r < boardSize; r++) {
+                let row = board[r].slice().reverse();
+                let result = slide(row);
+                board[r] = result.newRow.reverse();
+                if(result.changed) boardChanged = true;
+            }
+            return boardChanged;
+        }
+
+        function slideUp() {
+            let boardChanged = false;
+            for (let c = 0; c < boardSize; c++) {
+                let row = [board[0][c], board[1][c], board[2][c], board[3][c]];
+                let result = slide(row);
+                for (let r = 0; r < boardSize; r++) {
+                    board[r][c] = result.newRow[r];
+                }
+                if(result.changed) boardChanged = true;
+            }
+            return boardChanged;
+        }
+
+        function slideDown() {
+            let boardChanged = false;
+            for (let c = 0; c < boardSize; c++) {
+                let row = [board[0][c], board[1][c], board[2][c], board[3][c]].reverse();
+                let result = slide(row);
+                result.newRow.reverse();
+                for (let r = 0; r < boardSize; r++) {
+                    board[r][c] = result.newRow[r];
+                }
+                if(result.changed) boardChanged = true;
+            }
+            return boardChanged;
+        }
+
+        // ==========================
+        //     手機觸控監聽 (Touch)
+        // ==========================
+        
+        function addTouchListeners() {
+            const gameBoard = document.getElementById('game-board');
+
+            gameBoard.addEventListener('touchstart', function(e) {
+                // 記錄觸控開始位置
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                // 防止在遊戲區域內滑動時觸發瀏覽器滾動
+                e.preventDefault(); 
+            }, { passive: false });
+
+            gameBoard.addEventListener('touchend', function(e) {
+                // 記錄觸控結束位置
+                touchEndX = e.changedTouches[0].clientX;
+                touchEndY = e.changedTouches[0].clientY;
+                handleSwipe();
+            }, { passive: false });
+        }
+
+        function handleSwipe() {
+            if (document.getElementById("game-message").style.display === "flex") return;
+
+            let diffX = touchEndX - touchStartX;
+            let diffY = touchEndY - touchStartY;
+            let absDiffX = Math.abs(diffX);
+            let absDiffY = Math.abs(diffY);
+
+            // 設定閾值，防止輕微誤觸 (例如點擊)
+            if (Math.max(absDiffX, absDiffY) > 30) {
+                let moved = false;
+                if (absDiffX > absDiffY) {
+                    // 水平滑動
+                    if (diffX > 0) moved = slideRight();
+                    else moved = slideLeft();
+                } else {
+                    // 垂直滑動
+                    if (diffY > 0) moved = slideDown();
+                    else moved = slideUp();
+                }
+
+                if (moved) afterMove();
+            }
+        }
+
+        // ==========================
+        //     渲染與工具函數
+        // ==========================
 
         function updateBoard() {
             const gameBoard = document.getElementById("game-board");
-            // 清除除了 game-message 以外的所有子元素
             const message = document.getElementById("game-message");
             gameBoard.innerHTML = "";
             gameBoard.appendChild(message);
@@ -186,95 +392,26 @@
             }
         }
 
-        function updateScore() {
+        function updateScoreDisplay() {
             document.getElementById("score").innerText = score;
-        }
-
-        // 核心邏輯：過濾零（將非零數字緊湊排列）
-        function filterZero(row) {
-            return row.filter(num => num != 0);
-        }
-
-        function slide(row) {
-            // 1. 去除0 => [2, 2, 0, 2] -> [2, 2, 2]
-            row = filterZero(row); 
-
-            // 2. 合併 => [2, 2, 2] -> [4, 0, 2]
-            for (let i = 0; i < row.length - 1; i++) {
-                if (row[i] == row[i+1]) {
-                    row[i] *= 2;
-                    row[i+1] = 0;
-                    score += row[i];
-                }
-            }
-
-            // 3. 再次去除0 (因為合併產生了新的0) => [4, 0, 2] -> [4, 2]
-            row = filterZero(row);
-
-            // 4. 補回0直到長度為4 => [4, 2] -> [4, 2, 0, 0]
-            while (row.length < boardSize) {
-                row.push(0);
-            }
-            return row;
-        }
-
-        function slideLeft() {
-            for (let r = 0; r < boardSize; r++) {
-                let row = board[r];
-                let newRow = slide(row);
-                board[r] = newRow;
-            }
-        }
-
-        function slideRight() {
-            for (let r = 0; r < boardSize; r++) {
-                let row = board[r];
-                row.reverse(); // 反轉
-                let newRow = slide(row); // 向左滑邏輯
-                newRow.reverse(); // 再反轉回來
-                board[r] = newRow;
-            }
-        }
-
-        function slideUp() {
-            for (let c = 0; c < boardSize; c++) {
-                let row = [board[0][c], board[1][c], board[2][c], board[3][c]];
-                let newRow = slide(row);
-                // 寫回
-                for (let r = 0; r < boardSize; r++) {
-                    board[r][c] = newRow[r];
-                }
-            }
-        }
-
-        function slideDown() {
-            for (let c = 0; c < boardSize; c++) {
-                let row = [board[0][c], board[1][c], board[2][c], board[3][c]];
-                row.reverse();
-                let newRow = slide(row);
-                newRow.reverse();
-                for (let r = 0; r < boardSize; r++) {
-                    board[r][c] = newRow[r];
-                }
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('2048-bestScore', bestScore);
+                document.getElementById("best-score").innerText = bestScore;
             }
         }
 
         function setTwo() {
-            if (!hasEmptyTile()) {
-                return;
-            }
-            
+            if (!hasEmptyTile()) return;
             let found = false;
             while (!found) {
                 let r = Math.floor(Math.random() * boardSize);
                 let c = Math.floor(Math.random() * boardSize);
                 if (board[r][c] == 0) {
-                    // 90% 機率出 2，10% 機率出 4
                     board[r][c] = Math.random() > 0.1 ? 2 : 4;
                     found = true;
                 }
             }
-            updateScore();
         }
 
         function hasEmptyTile() {
@@ -287,24 +424,17 @@
         }
 
         function checkGameOver() {
-            // 如果還有空格，遊戲繼續
             if (hasEmptyTile()) return;
-
-            // 檢查是否還能合併（上下左右是否有相同數字）
-            // 橫向檢查
             for (let r = 0; r < boardSize; r++) {
                 for (let c = 0; c < boardSize - 1; c++) {
                     if (board[r][c] == board[r][c+1]) return;
                 }
             }
-            // 縱向檢查
             for (let c = 0; c < boardSize; c++) {
                 for (let r = 0; r < boardSize - 1; r++) {
                     if (board[r][c] == board[r+1][c]) return;
                 }
             }
-
-            // 無法移動，遊戲結束
             document.getElementById("game-message").style.display = "flex";
         }
     </script>
