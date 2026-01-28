@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>貪食蛇遊戲 v2.0</title>
+    <link rel="stylesheet" href="styles/shared.css">
     <style>
         /* 樣式保持原樣，符合"不要改原本的操作方式"與視覺風格 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -103,10 +104,17 @@
             <div class="high-score">最高分: <span id="high-score">0</span></div>
         </div>
         
-        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <canvas id="gameCanvas" width="500" height="500" aria-label="Snake game canvas"></canvas>
         
         <div class="controls">
             <div>方向鍵控制</div>
+        </div>
+        <!-- On-screen controls for mobile -->
+        <div id="snake-controls" class="snake-controls" aria-label="Snake controls">
+            <button id="btn-up" aria-label="Up">↑</button>
+            <button id="btn-left" aria-label="Left">←</button>
+            <button id="btn-right" aria-label="Right">→</button>
+            <button id="btn-down" aria-label="Down">↓</button>
         </div>
         
         <div class="instructions">
@@ -275,6 +283,16 @@
                 case 'ArrowRight': if (direction !== 'left') nextDirection = 'right'; break;
             }
         });
+
+        // Mobile on-screen controls wiring
+        const upBtn = document.getElementById('btn-up');
+        const leftBtn = document.getElementById('btn-left');
+        const rightBtn = document.getElementById('btn-right');
+        const downBtn = document.getElementById('btn-down');
+        if (upBtn) upBtn.addEventListener('click', () => { if (gameRunning && direction !== 'down') nextDirection = 'up'; });
+        if (leftBtn) leftBtn.addEventListener('click', () => { if (gameRunning && direction !== 'right') nextDirection = 'left'; });
+        if (rightBtn) rightBtn.addEventListener('click', () => { if (gameRunning && direction !== 'left') nextDirection = 'right'; });
+        if (downBtn) downBtn.addEventListener('click', () => { if (gameRunning && direction !== 'up') nextDirection = 'down'; });
         
         document.getElementById('restartBtn').addEventListener('click', restartGame);
         

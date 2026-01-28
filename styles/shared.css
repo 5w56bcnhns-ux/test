@@ -1,0 +1,66 @@
+/* Shared UI baseline for the HTML game library */
+:root {
+  --bg: #1a1a2e;
+  --card: #2d2d44;
+  --text: #ffffff;
+  --muted: #aaa;
+  --accent: #ff4d4d;
+  --accent-dark: #ff1a1a;
+  --gap: 12px;
+  --radius: 12px;
+  --font: ui-sans-serif, system-ui, -apple-system, Arial;
+}
+
+html, body {
+  height: 100%;
+}
+body {
+  font-family: var(--font);
+  margin: 0;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+/* Unified header look for lobby/pages with a light, readable UI */
+.header, .subheader {
+  font-family: var(--font);
+}
+.score, .high-score, .score-box {
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: inline-block;
+}
+.game-card {
+  background: #2d2d44;
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 20px 28px;
+  text-decoration: none;
+  display: inline-block;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.game-card:hover { background: #3d3d5c; transform: translateY(-2px); }
+
+/* Snake on-screen controls (mobile) */
+.snake-controls {
+  display: none;
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 8px;
+  z-index: 50;
+}
+.snake-controls button {
+  width: 46px; height: 46px; border-radius: 8px;
+  border: none; background: rgba(0,0,0,0.5); color: #fff; font-size: 20px;
+}
+.snake-controls button:active { transform: scale(0.98); }
+
+@media (max-width: 700px) {
+  .snake-controls { display: grid; grid-template-columns: 1fr 1fr; }
+}
+
+/* Optional subtle page-level typography improvements */
+.tiny { font-size: 12px; color: var(--muted); }
