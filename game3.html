@@ -230,6 +230,9 @@
         
         <div id="game-over" class="game-over-overlay">
             <h2 style="font-size: 40px; color:#776e65; margin:0;">遊戲結束</h2>
+            <div class="final-score" style="font-size: 24px; color:#776e65; margin:20px 0;">
+                最終分數: <span id="final-score">0</span>
+            </div>
             <button onclick="game.restart()">再來一局</button>
         </div>
     </div>
@@ -423,6 +426,8 @@
                         this.spawnTile();
                         this.isProcessing = false;
                         if(!this.movesAvailable()) {
+                            // Update final score display
+                            document.getElementById("final-score").textContent = this.score;
                             document.getElementById("game-over").classList.add("show");
                         }
                     }, 160); // 略大於 CSS transition 時間
